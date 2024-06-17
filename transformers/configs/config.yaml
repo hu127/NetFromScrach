@@ -1,7 +1,7 @@
 # datasets settings
 data_source: opus_books
 lang_src: en
-lang_dst: it
+lang_tgt: it
 tockenizer_file: configs/tockenizer_{0}.json
 
 # model settings
@@ -15,5 +15,6 @@ batch_size: 32
 num_epochs: 10
 learning_rate: 5e-5
 d_model: 512
-seq_len: 128
+seq_len: 310
+train_ratio: 0.9
 

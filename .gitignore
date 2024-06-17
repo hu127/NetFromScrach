@@ -1,0 +1,3 @@
+transformers/__pycache__
+transformers/opus_books_weights
+transformers/configs/tockenizer*.json

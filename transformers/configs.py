@@ -11,7 +11,7 @@ class Configs:
     def get_all_configs(self):
         return self.configs
 
-config_path = 'configs/config.yaml'
-configs = Configs(config_path)
-print(configs.get_all_configs())
-print(configs.get_config('lang_src'))
+# config_path = 'configs/config.yaml'
+# configs = Configs(config_path)
+# print(configs.get_all_configs())
+# print(configs.get_config('lang_src'))
