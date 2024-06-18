@@ -43,10 +43,10 @@ class PositionalEncoding(nn.Module):
     # 并且它们的设计目的是为了在模型中引入位置信息，而不需要通过训练来学习这些编码
     # 位置编码需要 dropout 的主要原因是为了防止模型对特定位置模式的过拟合，
     # 因为位置编码是固定的，所以模型可能会学习到这些位置编码的特定模式，而不是真正的序列模式
-    def forward(self, x):
+    def forward(self, x, requires_grad=False):
         # x: (batch_size, seq_len, d_model)
         x = x + self.pe[:, :x.shape[1],:] # extract seq_len length of positional encoding
-        x.requires_grad = False 
+        x.requires_grad = requires_grad 
         return self.dropout(x)
 
 def build_transformer(src_vocab_size, tgt_vocab_size, src_seq_len, tgt_seq_len, d_model =512, nhead=8, ff_dim=2048, num_encoders=6, num_decoders=6, dropout=0.1):
