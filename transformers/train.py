@@ -12,6 +12,7 @@ from tokenizers.trainers import WordLevelTrainer
 
 from configs import Configs
 from biDatasets import BilingualDataset
+from models import build_transformer
 
 def get_all_sentences(dataset, lang):
     for item in dataset:
@@ -69,7 +70,24 @@ def load_data(configs, verbose=False):
     return dataloader_train, dataloader_val, tokenizer_src, tokenizer_tgt
 
 
+def get_model(configs, tokenizer_src, tokenizer_tgt):
+    print("Building model...")
+    print("Source vocab size:", tokenizer_src.get_vocab_size())
+    print("Target vocab size:", tokenizer_tgt.get_vocab_size())
+    model = build_transformer(
+        src_vocab_size=tokenizer_src.get_vocab_size(),
+        tgt_vocab_size=tokenizer_tgt.get_vocab_size(),
+        src_seq_len=configs['seq_len'],
+        tgt_seq_len=configs['seq_len'],
+        d_model=configs['d_model'],
+        nhead=configs['nhead'],
+        num_encoders=configs['num_encoders'],
+        num_decoders=configs['num_decoders'],
+        ff_dim=configs['ff_dim'],
+        dropout=configs['dropout']
+    )
 
+    return model
 
 def print_config(configs):
     for key, value in configs.items():
@@ -97,6 +115,8 @@ def train_model(configs, verbose=False):
     # get dataloader & tokenizer
     print("Loading data...")
     dataloader_train, dataloader_val, tokenizer_src, tokenizer_tgt = load_data(configs, verbose=verbose)
+    
+    model = get_model(configs, tokenizer_src, tokenizer_tgt).to(device)
     
 
 
