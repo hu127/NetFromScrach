@@ -70,10 +70,11 @@ def load_data(configs, verbose=False):
     return dataloader_train, dataloader_val, tokenizer_src, tokenizer_tgt
 
 
-def get_model(configs, tokenizer_src, tokenizer_tgt):
+def get_model(configs, tokenizer_src, tokenizer_tgt, verbose=False):
     print("Building model...")
-    print("Source vocab size:", tokenizer_src.get_vocab_size())
-    print("Target vocab size:", tokenizer_tgt.get_vocab_size())
+    if verbose:
+        print("Source vocab size:", tokenizer_src.get_vocab_size())
+        print("Target vocab size:", tokenizer_tgt.get_vocab_size())
     model = build_transformer(
         src_vocab_size=tokenizer_src.get_vocab_size(),
         tgt_vocab_size=tokenizer_tgt.get_vocab_size(),
@@ -84,7 +85,8 @@ def get_model(configs, tokenizer_src, tokenizer_tgt):
         num_encoders=configs['num_encoders'],
         num_decoders=configs['num_decoders'],
         ff_dim=configs['ff_dim'],
-        dropout=configs['dropout']
+        dropout=configs['dropout'],
+        verbose=verbose
     )
 
     return model
@@ -116,7 +118,7 @@ def train_model(configs, verbose=False):
     print("Loading data...")
     dataloader_train, dataloader_val, tokenizer_src, tokenizer_tgt = load_data(configs, verbose=verbose)
     
-    model = get_model(configs, tokenizer_src, tokenizer_tgt).to(device)
+    model = get_model(configs, tokenizer_src, tokenizer_tgt, verbose).to(device)
     
 
 

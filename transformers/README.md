@@ -1,8 +1,13 @@
 # Transformer
-- [x] Vocab Embedding
-- [x] Position Embedding
-- [ ] Add & Norm
-  - [ ] Layer Normalization
-- [ ] Multi-Head Attention
-- [ ] Fead Forward
-- [ ] Residual Connection
+- [x] Model
+  - [x] Vocab Embedding
+  - [x] Position Embedding
+  - [x] Add & Norm
+    - [x] Layer Normalization
+  - [x] Multi-Head Attention
+  - [x] Fead Forward
+  - [x] Residual Connection
+- [ ] Train
+  - [ ] Loss
+  - [ ] validation
+  - [ ] visualization
