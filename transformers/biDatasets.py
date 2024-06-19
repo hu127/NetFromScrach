@@ -75,15 +75,15 @@ class BilingualDataset(Dataset):
         return {
             'encoder_input': src_ids, # seq_len
             'decoder_input': tgt_ids, # seq_len
-            'label': labels, # seq_len
+            'labels': labels, # seq_len
             'encoder_text': src_text,
             'decoder_text': tgt_text,
             'encoder_mask': (src_ids != self.pad_token).unsqueeze(0).unsqueeze(0).int(), # 1, 1, seq_len
-            'decoder_mask': (tgt_ids != self.pad_token).unsqueeze(0).int() & tri_mask(self.seq_len), # 1, seq_len, seq_len
+            'decoder_mask': (tgt_ids != self.pad_token).unsqueeze(0).int() & self.tri_mask(self.seq_len), # 1, seq_len, seq_len
         }
     
     # define the mask for the decoder
-    def tri_mask(size):
+    def tri_mask(self, size):
         mask = torch.triu(torch.ones(1, size, size), diagonal=1).type(torch.int)
         return mask == 0
         

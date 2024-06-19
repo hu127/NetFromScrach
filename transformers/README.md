@@ -8,6 +8,7 @@
   - [x] Fead Forward
   - [x] Residual Connection
 - [ ] Train
-  - [ ] Loss
-  - [ ] validation
+  - [x] Loss
+  - [x] validation
   - [ ] visualization
+- [ ] Inference

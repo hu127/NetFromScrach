@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import math
 
 class InputEmbedding(nn.Module):
     def __init__(self, vocab_size, d_model, seq_len, verbose=False):
@@ -55,10 +56,9 @@ class PositionalEncoding(nn.Module):
     # 并且它们的设计目的是为了在模型中引入位置信息，而不需要通过训练来学习这些编码
     # 位置编码需要 dropout 的主要原因是为了防止模型对特定位置模式的过拟合，
     # 因为位置编码是固定的，所以模型可能会学习到这些位置编码的特定模式，而不是真正的序列模式
-    def forward(self, x, requires_grad=False):
+    def forward(self, x):
         # x: (batch_size, seq_len, d_model)
-        x = x + self.pe[:, :x.shape[1],:] # extract seq_len length of positional encoding
-        x.requires_grad = requires_grad 
+        x = x + (self.positional_encoding[:, :x.shape[1],:]).requires_grad_(False)  # extract seq_len length of positional encoding
         return self.dropout(x)
 
 class MultiHeadAttention(nn.Module):
@@ -159,8 +159,8 @@ class LayerNormalization(nn.Module):
     
     def forward(self, x):
         # x: (batch_size, seq_len, d_model)
-        mean = x.mean(dim=-1, keepdim=True) # (batch_size, seq_len, 1)
-        std = x.std(dim=-1, keepdim=True) # (batch_size, seq_len, 1)
+        mean = torch.mean(x, dim=-1, keepdim=True) # (batch_size, seq_len, 1)
+        std = torch.std(x, dim=-1, keepdim=True) # (batch_size, seq_len, 1)
         return self.gamma * (x - mean) / (std + self.eps) + self.beta
 
 class AddAndNormLayer(nn.Module):
