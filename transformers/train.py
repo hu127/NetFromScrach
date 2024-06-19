@@ -239,6 +239,11 @@ def train_model(configs, verbose=False):
     dataloader_train, dataloader_val, tokenizer_src, tokenizer_tgt = load_data(configs, verbose=verbose)
     
     model = get_model(configs, tokenizer_src, tokenizer_tgt, verbose).to(device)
+    
+    print("Model summary:")
+    print("Total number of parameters:", sum(p.numel() for p in model.parameters()))
+    print("Total number of trainable parameters:", sum(p.numel() for p in model.parameters() if p.requires_grad))
+    print("Total amount of memory:", sum(p.numel() * p.element_size() for p in model.parameters()) / 1024 / 1024, "MB")
 
     optimizer = torch.optim.Adam(model.parameters(), lr=float(configs['learning_rate']))
 
@@ -305,7 +310,7 @@ def train_model(configs, verbose=False):
 
             # calculate loss with labels
             loss = loss_fn(logits.view(-1, logits.size(-1)), labels.view(-1)) # (batch_size * seq_len, vocab_size)
-            batch_iter.set_postfix("loss", f"{loss.item():6.4f}")
+            batch_iter.set_postfix({"loss": f"{loss.item():6.4f}"})
 
             # logging
             writer.add_scalar("train loss", loss.item(), global_step)
