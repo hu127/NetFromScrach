@@ -1,0 +1,25 @@
+# datasets settings
+data_source: food101
+
+# model settings
+model_folder: weights
+model_basename: tmodel_
+preload: latest
+logs_folder: runs/tmodel
+
+d_model: 512
+seq_len: 320
+nhead: 8
+num_encoders: 6
+num_decoders: 6
+ff_dim: 2048
+dropout: 0.1
+label_smoothing: 0.1
+
+# training settings
+batch_size: 10
+num_epochs: 10
+learning_rate: 5e-5
+train_ratio: 0.9
+
+
