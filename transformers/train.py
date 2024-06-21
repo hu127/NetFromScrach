@@ -170,7 +170,7 @@ def run_validation(model, dataloader_val, tokenizer_tgt, device, writer, num_exa
 
             source_text = batch['encoder_text']
             target_text = batch['decoder_text']
-            predicted_text = greedy_decode(model, encoder_input, encoder_mask, labels, device, verbose)
+            predicted_text = greedy_decode(model, encoder_input, encoder_mask, tokenizer_tgt, labels.size(1), device, verbose)
             predicted_text = predicted_text.detach().cpu() 
             predicted_text = tokenizer_tgt.decode(predicted_text.tolist())
 
