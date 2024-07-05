@@ -27,6 +27,7 @@ learning_rate = 1e-3
 num_training_updates = 15000
 decay = 0.99
 
+verbose = True
 
 img_transformes = transforms.Compose([
     transforms.ToTensor(),

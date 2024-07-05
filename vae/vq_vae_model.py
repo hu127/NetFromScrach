@@ -3,12 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class VectorQuantizer(nn.Module):
-    def __init__(self, num_embedding, embedding_dim, commitement_cost):
+    def __init__(self, num_embedding, embedding_dim, commitement_cost, verbose=False):
         super(VectorQuantizer, self).__init__()
         self.embedding_dim = embedding_dim
         self.num_embedding = num_embedding
         # commitement_cost is the beta parameter in the loss function
         self.commitement_cost = commitement_cost
+        self.verbose = verbose
 
         # Create embedding table with size num_embedding x embedding_dim
         self.embedding = nn.Embedding(self.num_embedding, self.embedding_dim)
@@ -16,6 +17,8 @@ class VectorQuantizer(nn.Module):
         self.embedding.weight.data.uniform_(-1/self.num_embedding, 1/self.num_embedding)
     
     def forward(self, inputs):
+        if self.verbose:
+            print('inputs:', inputs.shape)
         # convert inputs from BCHW -> BHWC
         x = inputs.permute(0, 2, 3, 1).contiguous()
 
@@ -63,7 +66,7 @@ class VectorQuantizer(nn.Module):
     
 
 class ResidualBlock(nn.Module):
-    def __init__(self, in_channels, num_hiddens, num_residual_hiddens):
+    def __init__(self, in_channels, num_hiddens, num_residual_hiddens, verbose=False):
         super(ResidualBlock, self).__init__()
         self.resblock = nn.Sequential(
             nn.ReLU(),
@@ -71,14 +74,16 @@ class ResidualBlock(nn.Module):
             nn.ReLU(),
             nn.Conv2d(in_channels=num_residual_hiddens, out_channels=num_hiddens, kernel_size=1, stride=1, bias=False)
         )
+        self.verbose = verbose
     
     def forward(self, x):
         return x + self.resblock(x)
 
 class ResidualStack(nn.Module):
-    def __init__(self, in_channels, num_hiddens, num_residual_layers, num_residual_hiddens):
+    def __init__(self, in_channels, num_hiddens, num_residual_layers, num_residual_hiddens, verbose=False):
         super(ResidualStack, self).__init__()
         self.resstack = nn.ModuleList([ResidualBlock(in_channels, num_hiddens, num_residual_hiddens) for _ in range(num_residual_layers)])
+        self.verbose = verbose
     
     def forward(self, x):
         for block in self.resstack:
@@ -86,13 +91,14 @@ class ResidualStack(nn.Module):
         return F.relu(x)
 
 class Encoder(nn.Module):
-    def __init__(self, in_channels, num_hiddens, num_residual_layers, num_residual_hiddens):
+    def __init__(self, in_channels, num_hiddens, num_residual_layers, num_residual_hiddens, verbose=False):
         super(Encoder, self).__init__()
         
         self.conv_1 = nn.Conv2d(in_channels=in_channels, out_channels=num_hiddens//2, kernel_size=4, stride=2, padding=1)
         self.conv_2 = nn.Conv2d(in_channels=num_hiddens//2, out_channels=num_hiddens, kernel_size=4, stride=2, padding=1)
         self.conv_3 = nn.Conv2d(in_channels=num_hiddens, out_channels=num_hiddens, kernel_size=3, stride=1, padding=1)
         self.residual_stack = ResidualStack(num_hiddens, num_hiddens, num_residual_layers, num_residual_hiddens)
+        self.verbose = verbose
     
     def forward(self, x):
         x = F.relu(self.conv_1(x))
@@ -101,13 +107,14 @@ class Encoder(nn.Module):
         return self.residual_stack(x)
 
 class Decoder(nn.Module):
-    def __init__(self, in_channels, num_hiddens, num_residual_layers, num_residual_hiddens):
+    def __init__(self, in_channels, num_hiddens, num_residual_layers, num_residual_hiddens, verbose=False):
         super(Decoder, self).__init__()
         
         self.conv_1 = nn.Conv2d(in_channels=in_channels, out_channels=num_hiddens, kernel_size=3, stride=1, padding=1)
         self.residual_stack = ResidualStack(num_hiddens, num_hiddens, num_residual_layers, num_residual_hiddens)
         self.conv_trans_1 = nn.ConvTranspose2d(in_channels=num_hiddens, out_channels=num_hiddens//2, kernel_size=4, stride=2, padding=1)
         self.conv_trans_2 = nn.ConvTranspose2d(in_channels=num_hiddens//2, out_channels=3, kernel_size=4, stride=2, padding=1)
+        self.verbose = verbose
     
     def forward(self, x):
         x = self.conv_1(x)
@@ -118,7 +125,7 @@ class Decoder(nn.Module):
 
 
 class VQ_VAE(nn.Module):
-    def __init__(self, in_channels, num_hiddens, num_residual_layers, num_residual_hiddens, num_embeddings, embedding_dim, commitment_cost, decay=0):
+    def __init__(self, in_channels, num_hiddens, num_residual_layers, num_residual_hiddens, num_embeddings, embedding_dim, commitment_cost, verbose=False, decay=0):
         super(VQ_VAE, self).__init__()
         
         self.encoder = Encoder(in_channels, num_hiddens, num_residual_layers, num_residual_hiddens)
@@ -126,6 +133,7 @@ class VQ_VAE(nn.Module):
         self.vector_quantizer = VectorQuantizer(num_embeddings, embedding_dim, commitment_cost)
         self.decoder = Decoder(embedding_dim, num_hiddens, num_residual_layers, num_residual_hiddens)
         self.decay = decay
+        self.verbose = verbose
     
     def forward(self, x):
         z = self.encoder(x)
