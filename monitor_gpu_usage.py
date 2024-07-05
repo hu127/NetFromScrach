@@ -5,16 +5,18 @@ import time
 import psutil
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 
 # get the pid of the training process
 def get_pid():
     pid = os.popen('ps -ef | grep "python3 train.py" | grep -v grep | awk \'{print $2}\'').read()
+    print('pid: ', pid)
     return pid
 
 # get the gpu usage of the training process
-def get_gpu_usage(pid):
-    cmd = 'nvidia-smi -l 1 -q -i 0 | grep "Gpu" | awk \'{print $3}\''
-    gpu_usage = os.popen(cmd).read()
+def get_gpu_usage(pid, gpu_id=0):
+    gpu_usage = os.popen('nvidia-smi --query-gpu=utilization.gpu --format=csv,nounits -i %d | sed -n 2p' % gpu_id).read()
+    print('gpu usage: ', gpu_usage)
     return gpu_usage
 
 # monitor the gpu usage of the training process

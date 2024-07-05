@@ -10,6 +10,7 @@ from torch.optim import Adam
 import torchmetrics
 
 from tqdm import tqdm
+from packaging import version
 
 from datasets import load_dataset
 from tokenizers import Tokenizer
@@ -20,8 +21,15 @@ from tokenizers.trainers import WordLevelTrainer
 import config
 from config import Configs
 from biDatasets import BilingualDataset
-from models import build_transformer
+from models import build_transformer, LabelSmotthingCrossEntropyLoss
 
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    
 def get_all_sentences(dataset, lang):
     for item in dataset:
         yield item['translation'][lang]
@@ -57,10 +65,11 @@ def load_data(configs, verbose=False):
     train_dataset = BilingualDataset(train_raw, tokenizer_src, tokenizer_tgt, configs['lang_src'], configs['lang_tgt'], seq_len=configs['seq_len'])
     val_dataset = BilingualDataset(val_raw, tokenizer_src, tokenizer_tgt, configs['lang_src'], configs['lang_tgt'], seq_len=configs['seq_len'])
     
+    
+    print("Number of training examples:", len(train_dataset))
+    print("Number of validation examples:", len(val_dataset))
+    
     if verbose:
-        print("Number of training examples:", len(train_dataset))
-        print("Number of validation examples:", len(val_dataset))
-
         max_len_src = 0
         max_len_tgt = 0
         for item in dataset_raw:
@@ -106,7 +115,7 @@ def greedy_decode(model, encoder_input, encoder_mask, tokenizer_tgt, max_len, de
     eos_idx = tokenizer_tgt.token_to_id("[EOS]")
 
     with torch.no_grad():
-        encoder_output = model.encoder(encoder_input, encoder_mask)
+        encoder_output = model.encode(encoder_input, encoder_mask)
         # initialize decoder input with sos token
         decoder_input = torch.empty(1, 1).fill_(sos_idx).type_as(encoder_input).to(device)
     
@@ -117,7 +126,7 @@ def greedy_decode(model, encoder_input, encoder_mask, tokenizer_tgt, max_len, de
             if verbose:
                 print("decoder_input:", decoder_input.shape)
                 print("decoder_mask:", decoder_mask.shape)
-            decoder_output = model.decoder(decoder_input, encoder_output, encoder_mask, decoder_mask)
+            decoder_output = model.decode(decoder_input, encoder_output, encoder_mask, decoder_mask)
             logits = model.project(decoder_output)
             _, next_token = torch.max(logits[:, -1, :], dim=-1)
             decoder_input = torch.cat([decoder_input, next_token.unsqueeze(1)], dim=1)
@@ -131,6 +140,8 @@ def greedy_decode(model, encoder_input, encoder_mask, tokenizer_tgt, max_len, de
         
 
 def run_validation(model, dataloader_val, tokenizer_tgt, device, writer, num_examples=2, verbose=False):
+    
+    print("tokenizer_tgt type: ", type(tokenizer_tgt))
 
     # get the width of the console
     try:
@@ -218,6 +229,8 @@ def print_config(configs):
 def train_model(configs, verbose=False):
     print("Training model with the following configs:")
     print_config(configs)
+    
+    set_seed(int(configs['seed']))
 
     # define the device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -226,6 +239,7 @@ def train_model(configs, verbose=False):
         print("Device name:", torch.cuda.get_device_name(0))
         print("Memory allocated:", torch.cuda.memory_allocated(0))
         print("Memory cached:", torch.cuda.memory_reserved(0))
+        print("Device Id:", torch.cuda.current_device())
     else:
         print("Using CPU")
     
@@ -275,8 +289,14 @@ def train_model(configs, verbose=False):
         print("No weights loaded")
 
     # loss function
-    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=tokenizer_tgt.token_to_id("[PAD]"), label_smoothing=configs['label_smoothing']).to(device)
-
+    # loss_fn = torch.nn.CrossEntropyLoss(ignore_index=tokenizer_tgt.token_to_id("[PAD]"), label_smoothing=configs['label_smoothing']).to(device)
+    if version.parse(torch.__version__)>=version.parse('1.10.0'):
+        print("Using PyTorch version", torch.__version__, version.parse(torch.__version__)>=version.parse('1.10.0'))
+        loss_fn = torch.nn.CrossEntropyLoss(ignore_index=tokenizer_tgt.token_to_id("[PAD]"), label_smoothing=configs['label_smoothing']).to(device)
+    else:
+        loss_fn = LabelSmotthingCrossEntropyLoss(ignore_index=tokenizer_tgt.token_to_id("[PAD]"), label_smoothing=configs['label_smoothing']).to(device)
+        
+    
     # training loop
     for epoch in range(initial_epoch, configs['num_epochs']):
         # empty cache of GPU to avoid memory leak
@@ -325,6 +345,7 @@ def train_model(configs, verbose=False):
             global_step += 1
 
         # run validation
+        print("tokenizer_tgt type: ", type(tokenizer_tgt))
         run_validation(model, dataloader_val, tokenizer_tgt, device, writer, verbose)
 
         # save weights

@@ -1,6 +1,31 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import math
+
+# for torch version < 1.10.0, biuld LabelSmoothingLoss
+class LabelSmotthingCrossEntropyLoss(nn.Module):
+    def __init__(self, label_smoothing=0.1, reduction='mean', ignore_index=-100):
+        super(LabelSmotthingCrossEntropyLoss, self).__init__()
+        self.epsilon = label_smoothing # the smoothing factor
+        self.reduction = reduction # the reduction method for the loss
+        self.ignore_index = ignore_index # the index to ignore in the loss calculation
+
+    def forward(self, output, target):
+        # output: (batch_size*seq_len, vocab_size)
+        n_class = output.size(-1)
+        log_preds = F.log_softmax(output, dim=-1)
+        # create the one-hot encoding for the target
+        loss = -log_preds.gather(dim=1, index=target.view(-1, 1))
+        loss = loss.view(target.size(0), -1)
+        if self.reduction == 'sum':
+            loss = loss.sum()
+        elif self.reduction == 'mean':
+            loss = loss.mean()
+        else:
+            raise ValueError(f'Unsupported reduction: {self.reduction}')
+        return loss * self.epsilon / n_class + (1 - self.epsilon) * loss
+
 
 class InputEmbedding(nn.Module):
     def __init__(self, vocab_size, d_model, seq_len, verbose=False):

@@ -24,5 +24,6 @@ batch_size: 10
 num_epochs: 10
 learning_rate: 5e-5
 train_ratio: 0.9
+seed: 42
 
 

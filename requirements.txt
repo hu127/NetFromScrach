@@ -1,4 +1,5 @@
 datasets
-tokenizers
+tokenizers==0.10.3
 torchmetrics
 tensorboard
+psutil
