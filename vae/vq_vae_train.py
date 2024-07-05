@@ -7,7 +7,7 @@ import torchvision.transforms as transforms
 
 import numpy as np
 
-from vae.vq_vae_model import VQ_VAE
+from vq_vae_model import VQ_VAE
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
