@@ -21,33 +21,46 @@ class VectorQuantizer(nn.Module):
             print('inputs:', inputs.shape)
         # convert inputs from BCHW -> BHWC
         x = inputs.permute(0, 2, 3, 1).contiguous()
+        x_shape = x.shape
+        if self.verbose:
+            print('after vq permute x:', x.shape)
 
         # Flatten input to BHW x C, where C is the embedding dimension
-        x = x.view(-1, self.embedding_dim)
+        flat_x = x.view(-1, self.embedding_dim)
+        if self.verbose:
+            print('after vq flat x:', flat_x.shape)
 
         # Calculate distances between input and embedding vectors
         # flat_input: BHW x C
         # self.embedding.weight: num_embedding x C
         # distances: BHW x C
         # distance = ||x - e_k||^2 = ||x||^2 + ||e_k||^2 - 2 * x * e_k
-        distances = (torch.sum(x**2, dim=1, keepdim=True) 
+        distances = (torch.sum(flat_x**2, dim=1, keepdim=True) 
                      + torch.sum(self.embedding.weight**2, dim=1)
-                     - 2 * torch.matmul(x, self.embedding.weight.t()))
+                     - 2 * torch.matmul(flat_x, self.embedding.weight.t()))
+        if self.verbose:
+            print('vq distances:', distances.shape)
 
         # Find closest embedding, i.e. the one with the smallest distance
         # one hot encoding: BHW x num_embedding
         encoding_indices = torch.argmin(distances, dim=1).unsqueeze(1)
         encodings = torch.zeros(encoding_indices.shape[0], self.num_embedding, device=inputs.device)
         encodings.scatter_(1, encoding_indices, 1)
+        if self.verbose:
+            print('vq encodings:', encodings.shape)
 
         # Quantize and unflatten
         # quantized: BHW x C
-        quantized = torch.matmul(encodings, self.embedding.weight).view(x.shape)
+        quantized = torch.matmul(encodings, self.embedding.weight).view(x_shape)
+        if self.verbose:
+            print('vq quantized:', quantized.shape)
 
         # Loss = ||sg[e_k] - z_q||^2 + beta * ||z_q - sg[e_k]||^2
         q_latent_loss = F.mse_loss(quantized.detach(), x) # torch.mean((quantized.detach() - x)**2)
         e_latent_loss = F.mse_loss(quantized, x.detach()) # torch.mean((quantized - x.detach())**2)
         loss = q_latent_loss + self.commitement_cost * e_latent_loss
+        if self.verbose:
+            print('vq loss:', loss.shape)
 
         # Using straight through estimator for quantized
         # trick: pass gradient of x through quantized, but retain the value of quantized
@@ -60,9 +73,11 @@ class VectorQuantizer(nn.Module):
         perplexity = torch.exp(-torch.sum(avg_probs * torch.log(avg_probs + 1e-10)))
         
         # convert quantized from BHWC -> BCHW
-        quantized = quantized.permute(0, 3, 1, 2).contiguous()
+        quantized_convert = quantized.permute(0, 3, 1, 2).contiguous()
+        if self.verbose:
+            print('vq requantized:', quantized_convert.shape)
 
-        return loss, quantized, perplexity, encodings
+        return loss, quantized_convert, perplexity, encodings
     
 
 class ResidualBlock(nn.Module):
@@ -101,10 +116,21 @@ class Encoder(nn.Module):
         self.verbose = verbose
     
     def forward(self, x):
+        if self.verbose:
+            print('input:', x.shape)
         x = F.relu(self.conv_1(x))
+        if self.verbose:
+            print('after encoder conv_1:', x.shape)
         x = F.relu(self.conv_2(x))
+        if self.verbose:
+            print('after encoder conv_2:', x.shape)
         x = self.conv_3(x)
-        return self.residual_stack(x)
+        if self.verbose:
+            print('after encoder conv_3:', x.shape)
+        x = self.residual_stack(x)
+        if self.verbose:
+            print('after encoder residual stack:', x.shape)
+        return x
 
 class Decoder(nn.Module):
     def __init__(self, in_channels, num_hiddens, num_residual_layers, num_residual_hiddens, verbose=False):
@@ -117,10 +143,20 @@ class Decoder(nn.Module):
         self.verbose = verbose
     
     def forward(self, x):
+        if self.verbose:
+            print('input:', x.shape)
         x = self.conv_1(x)
+        if self.verbose:
+            print('after decoder conv_1:', x.shape)
         x = self.residual_stack(x)
+        if self.verbose:
+            print('after decoder residual stack:', x.shape)
         x = F.relu(self.conv_trans_1(x))
+        if self.verbose:
+            print('after decoder conv_trans_1:', x.shape)
         x = self.conv_trans_2(x)
+        if self.verbose:
+            print('after decoder conv_trans_2:', x.shape)
         return x
 
 
@@ -128,17 +164,19 @@ class VQ_VAE(nn.Module):
     def __init__(self, in_channels, num_hiddens, num_residual_layers, num_residual_hiddens, num_embeddings, embedding_dim, commitment_cost, verbose=False, decay=0):
         super(VQ_VAE, self).__init__()
         
-        self.encoder = Encoder(in_channels, num_hiddens, num_residual_layers, num_residual_hiddens)
+        self.encoder = Encoder(in_channels, num_hiddens, num_residual_layers, num_residual_hiddens,verbose=verbose)
         self.pre_vq_conv = nn.Conv2d(in_channels=num_hiddens, out_channels=embedding_dim, kernel_size=1, stride=1)
-        self.vector_quantizer = VectorQuantizer(num_embeddings, embedding_dim, commitment_cost)
-        self.decoder = Decoder(embedding_dim, num_hiddens, num_residual_layers, num_residual_hiddens)
+        self.vector_quantizer = VectorQuantizer(num_embeddings, embedding_dim, commitment_cost, verbose=verbose)
+        self.decoder = Decoder(embedding_dim, num_hiddens, num_residual_layers, num_residual_hiddens, verbose=verbose)
         self.decay = decay
         self.verbose = verbose
+        if self.verbose:
+            print('VQ-VAE model parameters:', sum(p.numel() for p in self.parameters()))
     
     def forward(self, x):
         z = self.encoder(x)
         z = self.pre_vq_conv(z)
         loss, quantized, perplexity, encodings = self.vector_quantizer(z)
         x_recon = self.decoder(quantized)
-        return loss, x_recon, perplexity, encodings
+        return loss, x_recon, perplexity
     
