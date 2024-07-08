@@ -4,3 +4,6 @@ transformers/configs/tockenizer*.json
 transformers/runs
 
 vae/data
+
+
+*/*.pth
