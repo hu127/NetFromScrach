@@ -27,7 +27,7 @@ learning_rate = 1e-3
 num_training_updates = 15000
 decay = 0.99
 
-verbose = True
+verbose = False
 
 img_transformes = transforms.Compose([
     transforms.ToTensor(),
@@ -59,7 +59,7 @@ for i in range(num_training_updates):
     
     optimizer.zero_grad()
     
-    vq_loss, data_recon, perplexity = model(data)
+    vq_loss, data_recon, perplexity = model(data, verbose=verbose)
     # Reconstruction loss, normalized by data variance
     recon_error = F.mse_loss(data_recon, data) / data_variance
     loss = recon_error + vq_loss
